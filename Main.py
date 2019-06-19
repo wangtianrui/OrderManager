@@ -43,6 +43,10 @@ def import_button():
 
 
 def template_toplevel():
+    """
+    选择模版
+    :return:
+    """
     # 模板子窗格
     template_window = tkinter.Toplevel()
     template_window.title("编辑与选择模板")
@@ -78,29 +82,160 @@ def template_toplevel():
                                                                                                              rely=0.91)
     tkinter.Button(packing_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
     # 快递模板
-    express_frame = tkinter.Frame(notebook, width=1170, height=800, bg="blue")
+    express_frame = tkinter.Frame(notebook, width=1170, height=800)
     notebook.add(packing_frame, text="       包装模板        ")
     notebook.add(express_frame, text="         运费模板       ")
     notebook.place(x=10, y=5)
+    # 运费tab
+    tkinter.Label(express_frame, text="已有快递公司", width=130, height=3, font=message_font).place(x=0, y=0)
+    # 运费表格
+    express_list_frame = tkinter.Frame(express_frame, width=1170, height=750, bg="#BDBDBD")
+    express_form = ttk.Treeview(express_list_frame, show="headings", height=36)
+    express_scroll = tkinter.Scrollbar(express_list_frame)
+    express_columns = [
+        "公司名字"
+    ]
+    express_form["columns"] = express_columns
+    for i in range(len(express_columns)):
+        express_form.column(express_columns[i], width=1155, anchor="center")
+        express_form.heading(express_columns[i], text=express_columns[i])
+    express_form.insert("", i, text="line", values=("顺丰标快(增量式)"))
+    express_form.insert("", i, text="line", values=("顺丰特惠(区间式)"))
+    express_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
+    express_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+    express_scroll.config(command=express_form.yview)
+    express_form.config(yscrollcommand=express_scroll.set)
+    express_list_frame.place(y=50)
+    # 运费页面按钮
+    tkinter.Button(express_frame, text="  导入新运费模板  ", font=message_font, command=add_express_template).place(relx=0.05,
+                                                                                                             rely=0.91)
+    tkinter.Button(express_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
 
 
 def add_packing_template():
+    """
+    添加包装模版
+    :return:
+    """
     add_pacing_window = tkinter.Toplevel()
     add_pacing_window.title("导入新的包装模板")
-    add_pacing_window.geometry("900x600+500+150")
+    add_pacing_window.geometry("350x600+500+150")
     add_pacing_window.resizable(0, 0)
+    add_pacing_window.attributes("-topmost", 1)
+    add_pacing_window.wm_attributes("-topmost", 1)
 
     # 品种
-    tkinter.Label(add_pacing_window, text="品种：", font=message_font).place(relx=0.1, rely=0.02)
-    cv = tkinter.StringVar()
-    kind_com = ttk.Combobox(add_pacing_window, textvariable=cv)
-    kind_com.place(relx=0.17, rely=0.02)
+    y_local = 0.07
+    tkinter.Label(add_pacing_window, text="品种：", font=message_font).place(relx=0.1, rely=y_local)
+    kind_cv = tkinter.StringVar()
+    kind_com = ttk.Combobox(add_pacing_window, textvariable=kind_cv)
+    kind_com.place(relx=0.3, rely=y_local)
     kind_com["value"] = ("虾", "鱼", "蟹")
 
     # 重量范围
-    tkinter.Label(add_pacing_window, text="重量范围：", font=message_font).place(relx=0.1, rely=0.12)
-    weight_entry_low = tkinter.Entry(add_pacing_window)
-    weight_entry_low.place(relx=0.2, rely=0.12)
+    y_local = y_local + 0.1
+    tkinter.Label(add_pacing_window, text="重量范围：", font=message_font).place(relx=0.1, rely=y_local)
+    weight_entry_low = tkinter.Entry(add_pacing_window, width=5)
+    weight_entry_low.place(relx=0.33, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg ~").place(relx=0.44, rely=y_local)
+    weight_entry_high = tkinter.Entry(add_pacing_window, width=5)
+    weight_entry_high.place(relx=0.55, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.65, rely=y_local)
+
+    # 保温箱
+    y_local = y_local + 0.1
+    tkinter.Label(add_pacing_window, text="保温箱数量：", font=message_font).place(relx=0.1, rely=y_local)
+    box_cv = tkinter.StringVar()
+    box_com = ttk.Combobox(add_pacing_window, textvariable=box_cv, width=7)
+    box_com.place(relx=0.4, rely=y_local)
+    box_com["value"] = (1, 2, 3, 4)
+    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+
+    # 保温袋
+    y_local = y_local + 0.1
+    tkinter.Label(add_pacing_window, text="保温袋数量：", font=message_font).place(relx=0.1, rely=y_local)
+    bag_cv = tkinter.StringVar()
+    bag_com = ttk.Combobox(add_pacing_window, textvariable=bag_cv, width=7)
+    bag_com.place(relx=0.4, rely=y_local)
+    bag_com["value"] = (1, 2, 3, 4)
+    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+
+    # 干冰
+    y_local = y_local + 0.1
+    tkinter.Label(add_pacing_window, text="干冰数量：", font=message_font).place(relx=0.1, rely=y_local)
+    ice_count = tkinter.Entry(add_pacing_window, width=5)
+    ice_count.place(relx=0.37, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.57, rely=y_local)
+
+    # 防水袋
+    y_local = y_local + 0.1
+    tkinter.Label(add_pacing_window, text="防水袋数量：", font=message_font).place(relx=0.1, rely=y_local)
+    waterproof_cv = tkinter.StringVar()
+    waterproof_com = ttk.Combobox(add_pacing_window, textvariable=waterproof_cv, width=7)
+    waterproof_com.place(relx=0.4, rely=y_local)
+    waterproof_com["value"] = (1, 2, 3, 4)
+    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+
+    # 纸箱数量
+    y_local = y_local + 0.1
+    tkinter.Label(add_pacing_window, text="纸箱数量：", font=message_font).place(relx=0.1, rely=y_local)
+    paper_box_cv = tkinter.StringVar()
+    paper_box_com = ttk.Combobox(add_pacing_window, textvariable=paper_box_cv, width=7)
+    paper_box_com.place(relx=0.4, rely=y_local)
+    paper_box_com["value"] = (1, 2, 3, 4)
+    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+
+    # 总价显示
+    y_local = y_local + 0.1
+    str = "包装总价：" + "123"
+    tkinter.Label(add_pacing_window, text=str, font=("黑体", 18), fg="red").place(relx=0.1, rely=y_local)
+    tkinter.Button(add_pacing_window, text="  确定添加  ", font=message_font).place(relx=0.5, rely=y_local + 0.1)
+
+
+def add_express_template():
+    """
+    添加运费模版
+    :return:
+    """
+    add_express_window = tkinter.Toplevel()
+    add_express_window.title("添加运费模版")
+    add_express_window.geometry("300x200+800+400")
+    add_express_window.resizable(0, 0)
+    add_express_window.attributes("-toolwindow", 1)
+    add_express_window.wm_attributes("-topmost", 1)
+
+    tkinter.Label(add_express_window, text="请选择添加类型", font=message_font).place(relx=0.27, rely=0.1)
+    express_iv = tkinter.IntVar()
+    tkinter.Radiobutton(add_express_window, text="增量式", value=1, variable=express_iv).place(relx=0.15, rely=0.3)
+    tkinter.Radiobutton(add_express_window, text="区间式", value=2, variable=express_iv).place(relx=0.55, rely=0.3)
+    tkinter.Button(add_express_window, text=" 选择文件开始导入 ", command=get_express_xslm).place(relx=0.28, rely=0.7)
+
+
+def get_express_xslm():
+    """
+    获取运费模版文件
+    :return:
+    """
+    filename = filedialog.askopenfilename()
+    if str(filename).endswith(".xlsx"):
+        temp = pd.read_excel(filename)
+        if temp.columns.size == 18:
+            global_data["总表dataframe"] = temp
+            template_toplevel()
+        else:
+            message = "总表应有18列，您选择的表格有" + str(temp.columns.size) + "列"
+            messagebox.askokcancel("操作错误", message)
+    else:
+        messagebox.askokcancel("操作错误", "请选择表格文件！")
+
+
+def section_express():
+    section_window = tkinter.Toplevel()
+    section_window.title("导入新的包装模板")
+    section_window.geometry("350x600+500+150")
+    section_window.resizable(0, 0)
+    section_window.attributes("-topmost", 1)
+    section_window.wm_attributes("-topmost", 1)
 
 
 # 主窗口
