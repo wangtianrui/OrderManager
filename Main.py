@@ -106,6 +106,17 @@ def template_toplevel():
     express_scroll.config(command=express_form.yview)
     express_form.config(yscrollcommand=express_scroll.set)
     express_list_frame.place(y=50)
+
+    def open_section_express(event):
+        """
+        点击运费公司名
+        :param event:
+        :return:
+        """
+        section_express(express_form.item(express_form.selection(), "values"))
+
+    express_form.bind("<Double-Button-1>", open_section_express)
+
     # 运费页面按钮
     tkinter.Button(express_frame, text="  导入新运费模板  ", font=message_font, command=add_express_template).place(relx=0.05,
                                                                                                              rely=0.91)
@@ -229,13 +240,40 @@ def get_express_xslm():
         messagebox.askokcancel("操作错误", "请选择表格文件！")
 
 
-def section_express():
+def section_express(name):
+    """
+    区间式显示详细窗口
+    :return:
+    """
     section_window = tkinter.Toplevel()
-    section_window.title("导入新的包装模板")
-    section_window.geometry("350x600+500+150")
+    section_window.title(name)
+    section_window.geometry("450x600+700+150")
     section_window.resizable(0, 0)
     section_window.attributes("-topmost", 1)
     section_window.wm_attributes("-topmost", 1)
+    # 运费表格
+    section_list_frame = tkinter.Frame(section_window, width=450, height=500, bg="#BDBDBD")
+    section_form = ttk.Treeview(section_list_frame, show="headings", height=15)
+    section_scroll = tkinter.Scrollbar(section_list_frame)
+    section_columns = [
+        "目的省份", "首1kg(元)", "1.5kg-3kg(元)", ">3kg(元)"
+    ]
+    section_form["columns"] = section_columns
+    for i in range(len(section_columns)):
+        if i == 0:
+            wid = int(450 / 3)
+        else:
+            wid = int(450 / 3 * 2 / (len(section_columns) - 1))
+        section_form.column(section_columns[i], width=wid, anchor="center")
+        section_form.heading(section_columns[i], text=section_columns[i])
+    section_form.insert("", 0, text="line", values=("四川、山西", 5, 6, 3))
+    section_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海", 7, 8, 9))
+    section_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海、北京、上海、北京、上海、北京、上海", 12, 23, 43))
+    section_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
+    section_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+    section_scroll.config(command=section_form.yview)
+    section_form.config(yscrollcommand=section_scroll.set)
+    section_list_frame.pack()
 
 
 # 主窗口
