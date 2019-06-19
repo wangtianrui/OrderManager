@@ -74,13 +74,33 @@ def template_toplevel():
     packing_form.config(yscrollcommand=packing_scroll.set)
     packing_list_frame.place(y=50)
     # 包装页面按钮
-    tkinter.Button(packing_frame, text="  导入新包装模板  ", font=message_font).place(relx=0.05, rely=0.91)
+    tkinter.Button(packing_frame, text="  导入新包装模板  ", font=message_font, command=add_packing_template).place(relx=0.05,
+                                                                                                             rely=0.91)
     tkinter.Button(packing_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
     # 快递模板
     express_frame = tkinter.Frame(notebook, width=1170, height=800, bg="blue")
     notebook.add(packing_frame, text="       包装模板        ")
     notebook.add(express_frame, text="         运费模板       ")
     notebook.place(x=10, y=5)
+
+
+def add_packing_template():
+    add_pacing_window = tkinter.Toplevel()
+    add_pacing_window.title("导入新的包装模板")
+    add_pacing_window.geometry("900x600+500+150")
+    add_pacing_window.resizable(0, 0)
+
+    # 品种
+    tkinter.Label(add_pacing_window, text="品种：", font=message_font).place(relx=0.1, rely=0.02)
+    cv = tkinter.StringVar()
+    kind_com = ttk.Combobox(add_pacing_window, textvariable=cv)
+    kind_com.place(relx=0.17, rely=0.02)
+    kind_com["value"] = ("虾", "鱼", "蟹")
+
+    # 重量范围
+    tkinter.Label(add_pacing_window, text="重量范围：", font=message_font).place(relx=0.1, rely=0.12)
+    weight_entry_low = tkinter.Entry(add_pacing_window)
+    weight_entry_low.place(relx=0.2, rely=0.12)
 
 
 # 主窗口
