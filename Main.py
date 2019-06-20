@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
-import numpy as np
 import tkinter
 from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
+import pickle
+import os
 
 global_data = {}
 """
@@ -12,6 +13,29 @@ global_data = {}
 食材信息
 地区信息
 """
+packing_models = []
+express_models = []
+if not os.path.exists(r"./packing_file.txt"):
+    writer_packing_file = open("./packing_file.txt", "wb")
+    pickle.dump(packing_models, writer_packing_file, -1)
+    writer_express_file = open("./express_file.txt", "wb")
+    pickle.dump(express_models, writer_express_file, -1)
+else:
+    reader_packing_file = open("./packing_file.txt", "rb")
+    reader_express_file = open("./express_file.txt", "rb")
+    packing_models = pickle.load(reader_packing_file)
+    express_models = pickle.load(reader_express_file)
+
+
+def update():
+    """
+    更新两个模型
+    :return:
+    """
+    writer_packing_file = open("./packing_file.txt", "wb")
+    pickle.dump(packing_models, writer_packing_file, -1)
+    writer_express_file = open("./express_file.txt", "wb")
+    pickle.dump(express_models, writer_express_file, -1)
 
 
 def get_foodinfor():
@@ -30,6 +54,8 @@ def get_foodinfor():
 
     temp["货品名称"] = temp["货品名称"].apply(lambda x: drop_char(x))
     global_data["食材信息"] = temp
+    global_data["食材名"] = tuple(temp["货品名称"].unique())
+    print(global_data["食材名"])
 
 
 def get_addressinfor():
@@ -106,17 +132,17 @@ def template_toplevel():
     for i in range(len(packing_columns)):
         packing_form.column(packing_columns[i], width=int(1155 / len(packing_columns)), anchor="center")
         packing_form.heading(packing_columns[i], text=packing_columns[i])
-    for i in range(50):
-        packing_form.insert("", i, text="line", values=("虾", "50-80", "1", i + 2, i + 3, i - 1, i * 2, i, i * 100))
-
+    for item in packing_models:
+        packing_form.insert("", 1, value=item)
     packing_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
     packing_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
     packing_scroll.config(command=packing_form.yview)
     packing_form.config(yscrollcommand=packing_scroll.set)
     packing_list_frame.place(y=50)
     # 包装页面按钮
-    tkinter.Button(packing_frame, text="  导入新包装模板  ", font=message_font, command=add_packing_template).place(relx=0.05,
-                                                                                                             rely=0.91)
+    tkinter.Button(packing_frame, text="  导入新包装模板  ", font=message_font,
+                   command=lambda: add_packing_template(packing_form)).place(relx=0.05,
+                                                                             rely=0.91)
     tkinter.Button(packing_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
     # 快递模板
     express_frame = tkinter.Frame(notebook, width=1170, height=800)
@@ -165,11 +191,13 @@ def template_toplevel():
     tkinter.Button(express_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
 
 
-def add_packing_template():
+def add_packing_template(packing_form):
+    inputer = []
     """
     添加包装模版
     :return:
     """
+
     add_pacing_window = tkinter.Toplevel()
     add_pacing_window.title("导入新的包装模板")
     add_pacing_window.geometry("350x600+700+150")
@@ -185,7 +213,7 @@ def add_packing_template():
     kind_cv = tkinter.StringVar()
     kind_com = ttk.Combobox(add_pacing_window, textvariable=kind_cv)
     kind_com.place(relx=input_x_1, rely=y_local)
-    kind_com["value"] = ("虾", "鱼", "蟹")
+    kind_com["value"] = global_data["食材名"]
 
     # 重量范围
     y_local = y_local + 0.1
@@ -216,6 +244,16 @@ def add_packing_template():
     tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.52, rely=y_local)
     bag_cost = tkinter.Entry(add_pacing_window, width=5)
     bag_cost.place(relx=input_x_2, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
+
+    # 冰袋
+    y_local = y_local + 0.1
+    tkinter.Label(add_pacing_window, text="冰袋重量：", font=message_font).place(relx=0.1, rely=y_local)
+    icebag_count = tkinter.Entry(add_pacing_window, width=5)
+    icebag_count.place(relx=input_x_1, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.52, rely=y_local)
+    icebag_cost = tkinter.Entry(add_pacing_window, width=5)
+    icebag_cost.place(relx=input_x_2, rely=y_local)
     tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
 
     # 干冰
@@ -249,12 +287,48 @@ def add_packing_template():
     tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
 
     # 总价显示
-    y_local = y_local + 0.1
-    str = "包装总价：" + "123"
-    tkinter.Label(add_pacing_window, text=str, font=("黑体", 18), fg="red").place(relx=0.1, rely=y_local)
+    y_local = y_local + 0.05
+    str = tkinter.StringVar()
+    str.set("包装总价:%2.f元" % (0.00))
 
-    tkinter.Button(add_pacing_window, text="  确定添加  ", font=message_font).place(relx=0.6, rely=y_local + 0.1)
-    tkinter.Button(add_pacing_window, text="计算包装总价", font=message_font).place(relx=0.1, rely=y_local + 0.1)
+    tkinter.Label(add_pacing_window, textvariable=str, font=("黑体", 16), fg="red").place(relx=0.1, rely=y_local)
+
+    def get_cost():
+        whole_cost = 0
+        whole_cost += float(box_cost.get())
+        whole_cost += float(bag_cost.get())
+        whole_cost += float(icebag_cost.get())
+        whole_cost += float(ice_cost.get())
+        whole_cost += float(waterproof_cost.get())
+        whole_cost += float(paper_box_cost.get())
+        str.set("包装总价:%.2f元" % (whole_cost))
+
+    def add():
+        inputer.append(kind_com.get())
+        inputer.append(weight_entry_low.get() + "~" + weight_entry_high.get() + "kg")
+        inputer.append(box_count.get())
+        inputer.append(bag_count.get())
+        inputer.append(icebag_count.get())
+        inputer.append(ice_count.get())
+        inputer.append(waterproof_count.get())
+        inputer.append(paper_box_count.get())
+        cost = 0
+        cost += float(box_cost.get())
+        cost += float(bag_cost.get())
+        cost += float(icebag_cost.get())
+        cost += float(ice_cost.get())
+        cost += float(waterproof_cost.get())
+        cost += float(paper_box_cost.get())
+        inputer.append(cost)
+        packing_form.insert("", 1, text="line", value=inputer)
+        packing_models.append(inputer)
+        update()
+        add_pacing_window.destroy()
+
+    tkinter.Button(add_pacing_window, text="  确定添加  ", font=message_font, command=add).place(relx=0.6,
+                                                                                             rely=y_local + 0.05)
+    tkinter.Button(add_pacing_window, text="计算包装总价", font=message_font, command=get_cost).place(relx=0.1,
+                                                                                                rely=y_local + 0.05)
 
 
 def add_express_template():
