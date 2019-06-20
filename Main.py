@@ -7,6 +7,15 @@ from tkinter import filedialog
 from tkinter import messagebox
 
 global_data = {}
+"""
+总表dataframe
+"""
+
+
+def get_foodinfor():
+    data = global_data["总表dataframe"]
+    print()
+
 
 # 字体
 message_font = ("黑体", 13)
@@ -63,7 +72,7 @@ def template_toplevel():
     packing_form = ttk.Treeview(packing_list_frame, show="headings", height=36)
     packing_scroll = tkinter.Scrollbar(packing_list_frame)
     packing_columns = [
-        "品种", "重量范围", "保温箱数量", "保温袋数量", "冰袋数量", "干冰数量", "防水袋数量", "纸箱数量", "包装总价"
+        "品种", "重量范围", "保温箱重量", "保温袋重量", "冰袋重量", "干冰重量", "防水袋重量", "纸箱重量", "包装总价"
     ]
     packing_form["columns"] = packing_columns
     for i in range(len(packing_columns)):
@@ -107,15 +116,20 @@ def template_toplevel():
     express_form.config(yscrollcommand=express_scroll.set)
     express_list_frame.place(y=50)
 
-    def open_section_express(event):
+    def open_detail_express(event):
         """
         点击运费公司名
         :param event:
         :return:
         """
-        section_express(express_form.item(express_form.selection(), "values"))
+        name = express_form.item(express_form.selection(), "values")
 
-    express_form.bind("<Double-Button-1>", open_section_express)
+        if str(name).find("区间式") != -1:
+            section_express(name)
+        else:
+            incremental_express(name)
+
+    express_form.bind("<Double-Button-1>", open_detail_express)
 
     # 运费页面按钮
     tkinter.Button(express_frame, text="  导入新运费模板  ", font=message_font, command=add_express_template).place(relx=0.05,
@@ -130,77 +144,89 @@ def add_packing_template():
     """
     add_pacing_window = tkinter.Toplevel()
     add_pacing_window.title("导入新的包装模板")
-    add_pacing_window.geometry("350x600+500+150")
+    add_pacing_window.geometry("350x600+700+150")
     add_pacing_window.resizable(0, 0)
     add_pacing_window.attributes("-topmost", 1)
     add_pacing_window.wm_attributes("-topmost", 1)
+    input_x_1 = 0.4
+    input_x_2 = 0.66
 
     # 品种
     y_local = 0.07
     tkinter.Label(add_pacing_window, text="品种：", font=message_font).place(relx=0.1, rely=y_local)
     kind_cv = tkinter.StringVar()
     kind_com = ttk.Combobox(add_pacing_window, textvariable=kind_cv)
-    kind_com.place(relx=0.3, rely=y_local)
+    kind_com.place(relx=input_x_1, rely=y_local)
     kind_com["value"] = ("虾", "鱼", "蟹")
 
     # 重量范围
     y_local = y_local + 0.1
     tkinter.Label(add_pacing_window, text="重量范围：", font=message_font).place(relx=0.1, rely=y_local)
     weight_entry_low = tkinter.Entry(add_pacing_window, width=5)
-    weight_entry_low.place(relx=0.33, rely=y_local)
-    tkinter.Label(add_pacing_window, font=message_font, text="kg ~").place(relx=0.44, rely=y_local)
+    weight_entry_low.place(relx=input_x_1, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg ~").place(relx=input_x_1 + 0.12, rely=y_local)
     weight_entry_high = tkinter.Entry(add_pacing_window, width=5)
-    weight_entry_high.place(relx=0.55, rely=y_local)
-    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.65, rely=y_local)
+    weight_entry_high.place(relx=input_x_2, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.8, rely=y_local)
 
     # 保温箱
     y_local = y_local + 0.1
-    tkinter.Label(add_pacing_window, text="保温箱数量：", font=message_font).place(relx=0.1, rely=y_local)
-    box_cv = tkinter.StringVar()
-    box_com = ttk.Combobox(add_pacing_window, textvariable=box_cv, width=7)
-    box_com.place(relx=0.4, rely=y_local)
-    box_com["value"] = (1, 2, 3, 4)
-    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+    tkinter.Label(add_pacing_window, text="保温箱重量：", font=message_font).place(relx=0.1, rely=y_local)
+    box_count = tkinter.Entry(add_pacing_window, width=5)
+    box_count.place(relx=input_x_1, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.52, rely=y_local)
+
+    box_cost = tkinter.Entry(add_pacing_window, width=5)
+    box_cost.place(relx=input_x_2, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
 
     # 保温袋
     y_local = y_local + 0.1
-    tkinter.Label(add_pacing_window, text="保温袋数量：", font=message_font).place(relx=0.1, rely=y_local)
-    bag_cv = tkinter.StringVar()
-    bag_com = ttk.Combobox(add_pacing_window, textvariable=bag_cv, width=7)
-    bag_com.place(relx=0.4, rely=y_local)
-    bag_com["value"] = (1, 2, 3, 4)
-    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+    tkinter.Label(add_pacing_window, text="保温袋重量：", font=message_font).place(relx=0.1, rely=y_local)
+    bag_count = tkinter.Entry(add_pacing_window, width=5)
+    bag_count.place(relx=input_x_1, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.52, rely=y_local)
+    bag_cost = tkinter.Entry(add_pacing_window, width=5)
+    bag_cost.place(relx=input_x_2, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
 
     # 干冰
     y_local = y_local + 0.1
-    tkinter.Label(add_pacing_window, text="干冰数量：", font=message_font).place(relx=0.1, rely=y_local)
+    tkinter.Label(add_pacing_window, text="干冰重量：", font=message_font).place(relx=0.1, rely=y_local)
     ice_count = tkinter.Entry(add_pacing_window, width=5)
-    ice_count.place(relx=0.37, rely=y_local)
-    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.57, rely=y_local)
+    ice_count.place(relx=input_x_1, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.52, rely=y_local)
+    ice_cost = tkinter.Entry(add_pacing_window, width=5)
+    ice_cost.place(relx=input_x_2, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
 
     # 防水袋
     y_local = y_local + 0.1
-    tkinter.Label(add_pacing_window, text="防水袋数量：", font=message_font).place(relx=0.1, rely=y_local)
-    waterproof_cv = tkinter.StringVar()
-    waterproof_com = ttk.Combobox(add_pacing_window, textvariable=waterproof_cv, width=7)
-    waterproof_com.place(relx=0.4, rely=y_local)
-    waterproof_com["value"] = (1, 2, 3, 4)
-    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+    tkinter.Label(add_pacing_window, text="防水袋重量：", font=message_font).place(relx=0.1, rely=y_local)
+    waterproof_count = tkinter.Entry(add_pacing_window, width=5)
+    waterproof_count.place(relx=input_x_1, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.52, rely=y_local)
+    waterproof_cost = tkinter.Entry(add_pacing_window, width=5)
+    waterproof_cost.place(relx=input_x_2, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
 
-    # 纸箱数量
+    # 纸箱重量
     y_local = y_local + 0.1
-    tkinter.Label(add_pacing_window, text="纸箱数量：", font=message_font).place(relx=0.1, rely=y_local)
-    paper_box_cv = tkinter.StringVar()
-    paper_box_com = ttk.Combobox(add_pacing_window, textvariable=paper_box_cv, width=7)
-    paper_box_com.place(relx=0.4, rely=y_local)
-    paper_box_com["value"] = (1, 2, 3, 4)
-    tkinter.Label(add_pacing_window, font=message_font, text="个").place(relx=0.6, rely=y_local)
+    tkinter.Label(add_pacing_window, text="纸箱重量：", font=message_font).place(relx=0.1, rely=y_local)
+    paper_box_count = tkinter.Entry(add_pacing_window, width=5)
+    paper_box_count.place(relx=input_x_1, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="kg").place(relx=0.52, rely=y_local)
+    paper_box_cost = tkinter.Entry(add_pacing_window, width=5)
+    paper_box_cost.place(relx=input_x_2, rely=y_local)
+    tkinter.Label(add_pacing_window, font=message_font, text="元").place(relx=0.8, rely=y_local)
 
     # 总价显示
     y_local = y_local + 0.1
     str = "包装总价：" + "123"
     tkinter.Label(add_pacing_window, text=str, font=("黑体", 18), fg="red").place(relx=0.1, rely=y_local)
-    tkinter.Button(add_pacing_window, text="  确定添加  ", font=message_font).place(relx=0.5, rely=y_local + 0.1)
+
+    tkinter.Button(add_pacing_window, text="  确定添加  ", font=message_font).place(relx=0.6, rely=y_local + 0.1)
+    tkinter.Button(add_pacing_window, text="计算包装总价", font=message_font).place(relx=0.1, rely=y_local + 0.1)
 
 
 def add_express_template():
@@ -247,13 +273,13 @@ def section_express(name):
     """
     section_window = tkinter.Toplevel()
     section_window.title(name)
-    section_window.geometry("450x600+700+150")
+    section_window.geometry("1000x600+300+150")
     section_window.resizable(0, 0)
     section_window.attributes("-topmost", 1)
     section_window.wm_attributes("-topmost", 1)
     # 运费表格
-    section_list_frame = tkinter.Frame(section_window, width=450, height=500, bg="#BDBDBD")
-    section_form = ttk.Treeview(section_list_frame, show="headings", height=15)
+    section_list_frame = tkinter.Frame(section_window, width=1000, height=500, bg="#BDBDBD")
+    section_form = ttk.Treeview(section_list_frame, show="headings", height=25)
     section_scroll = tkinter.Scrollbar(section_list_frame)
     section_columns = [
         "目的省份", "首1kg(元)", "1.5kg-3kg(元)", ">3kg(元)"
@@ -261,9 +287,9 @@ def section_express(name):
     section_form["columns"] = section_columns
     for i in range(len(section_columns)):
         if i == 0:
-            wid = int(450 / 3)
+            wid = int(980 / 3 * 2)
         else:
-            wid = int(450 / 3 * 2 / (len(section_columns) - 1))
+            wid = int(980 / 3 / (len(section_columns) - 1))
         section_form.column(section_columns[i], width=wid, anchor="center")
         section_form.heading(section_columns[i], text=section_columns[i])
     section_form.insert("", 0, text="line", values=("四川、山西", 5, 6, 3))
@@ -274,6 +300,44 @@ def section_express(name):
     section_scroll.config(command=section_form.yview)
     section_form.config(yscrollcommand=section_scroll.set)
     section_list_frame.pack()
+    tkinter.Button(section_window, text="删除该模版", font=message_font).pack()
+
+
+def incremental_express(name):
+    """
+    增量式显示详细窗口
+    :return:
+    """
+    incremental_window = tkinter.Toplevel()
+    incremental_window.title(name)
+    incremental_window.geometry("1000x600+300+150")
+    incremental_window.resizable(0, 0)
+    incremental_window.attributes("-topmost", 1)
+    incremental_window.wm_attributes("-topmost", 1)
+    # 运费表格
+    incremental_list_frame = tkinter.Frame(incremental_window, width=1000, height=500, bg="#BDBDBD")
+    incremental_form = ttk.Treeview(incremental_list_frame, show="headings", height=25)
+    incremental_scroll = tkinter.Scrollbar(incremental_list_frame)
+    incremental_columns = [
+        "目的省份", "首1kg(元)", ">1kg(元/kg)"
+    ]
+    incremental_form["columns"] = incremental_columns
+    for i in range(len(incremental_columns)):
+        if i == 0:
+            wid = int(980 / 3 * 2)
+        else:
+            wid = int(980 / 3 / (len(incremental_columns) - 1))
+        incremental_form.column(incremental_columns[i], width=wid, anchor="center")
+        incremental_form.heading(incremental_columns[i], text=incremental_columns[i])
+    incremental_form.insert("", 0, text="line", values=("四川、山西", 5, 6))
+    incremental_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海", 7, 8))
+    incremental_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海、北京、上海、北京、上海、北京、上海", 12, 23))
+    incremental_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
+    incremental_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+    incremental_scroll.config(command=incremental_form.yview)
+    incremental_form.config(yscrollcommand=incremental_scroll.set)
+    incremental_list_frame.pack()
+    tkinter.Button(incremental_window, text="删除该模版", font=message_font).pack()
 
 
 # 主窗口
@@ -336,8 +400,8 @@ whole_scroll = tkinter.Scrollbar(form_context)
 # 填充表数据
 whole_columns = (
     "订单号", "店铺", "发货仓库", "食材", "量",
-    "保温箱数量", "保温袋数量", "冰袋数量", "干冰数量", "防水袋数量",
-    "纸箱数量", "包装总价", "食材总成本", "运费", "平台扣点", "纯利润"
+    "保温箱重量", "保温袋重量", "冰袋重量", "干冰重量", "防水袋重量",
+    "纸箱重量", "包装总价", "食材总成本", "运费", "平台扣点", "纯利润"
 )
 whole_tree["columns"] = whole_columns
 for i in range(len(whole_columns)):
