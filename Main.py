@@ -9,12 +9,38 @@ from tkinter import messagebox
 global_data = {}
 """
 总表dataframe
+食材信息
+地区信息
 """
 
 
 def get_foodinfor():
+    """
+    获取食材信息
+    :return:
+    """
     data = global_data["总表dataframe"]
-    print()
+    drop_list = ['g', 'k', '斤', '克', '半', '一', '二', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    temp = data[["货品名称", "下单数量", "预估重量"]]
+
+    def drop_char(x):
+        for i in drop_list:
+            x = x.replace(str(i), '')
+        return x
+
+    temp["货品名称"] = temp["货品名称"].apply(lambda x: drop_char(x))
+    global_data["食材信息"] = temp
+
+
+def get_addressinfor():
+    """
+    获取地区信息
+    :return:
+    """
+    data = global_data["总表dataframe"]
+    temp = data["收货地区"]
+    print(temp)
+    global_data["地区信息"] = temp
 
 
 # 字体
@@ -43,6 +69,8 @@ def import_button():
         temp = pd.read_excel(filename)
         if temp.columns.size == 18:
             global_data["总表dataframe"] = temp
+            get_addressinfor()
+            get_foodinfor()
             template_toplevel()
         else:
             message = "总表应有18列，您选择的表格有" + str(temp.columns.size) + "列"
