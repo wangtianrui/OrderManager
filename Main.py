@@ -5,6 +5,7 @@ from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
 import pickle
+import numpy as np
 import os
 
 global_data = {}
@@ -14,7 +15,7 @@ global_data = {}
 地区信息
 """
 packing_models = []
-express_models = []
+express_models = {}
 if not os.path.exists(r"./packing_file.txt"):
     writer_packing_file = open("./packing_file.txt", "wb")
     pickle.dump(packing_models, writer_packing_file, -1)
@@ -133,12 +134,33 @@ def template_toplevel():
         packing_form.column(packing_columns[i], width=int(1155 / len(packing_columns)), anchor="center")
         packing_form.heading(packing_columns[i], text=packing_columns[i])
     for item in packing_models:
-        packing_form.insert("", 1, value=item)
+        packing_form.insert("", "end", values=item)
     packing_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
     packing_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
     packing_scroll.config(command=packing_form.yview)
     packing_form.config(yscrollcommand=packing_scroll.set)
     packing_list_frame.place(y=50)
+
+    def deleteitem(event):
+        """
+        删除包装模板
+        :param event:
+        :return:
+        """
+        if tkinter.messagebox.askokcancel("提醒", "确定要删除该模板吗？"):
+            item = packing_form.selection()
+
+            value = packing_form.item(item)["values"]
+            for index in range(len(value)):
+                value[index] = str(value[index])
+            value[-1] = float(value[-1])
+            print(packing_models)
+            packing_models.remove(value)
+            packing_form.delete(item)
+            update()
+            tkinter.messagebox.showinfo('提醒', '删除成功')
+
+    packing_form.bind("<Double-Button-1>", deleteitem)
     # 包装页面按钮
     tkinter.Button(packing_frame, text="  导入新包装模板  ", font=message_font,
                    command=lambda: add_packing_template(packing_form)).place(relx=0.05,
@@ -162,8 +184,9 @@ def template_toplevel():
     for i in range(len(express_columns)):
         express_form.column(express_columns[i], width=1155, anchor="center")
         express_form.heading(express_columns[i], text=express_columns[i])
-    express_form.insert("", i, text="line", values=("顺丰标快(增量式)"))
-    express_form.insert("", i, text="line", values=("顺丰特惠(区间式)"))
+    for name in express_models:
+        print(name)
+        express_form.insert("", "end", values=(name))
     express_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
     express_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
     express_scroll.config(command=express_form.yview)
@@ -179,15 +202,16 @@ def template_toplevel():
         name = express_form.item(express_form.selection(), "values")
 
         if str(name).find("区间式") != -1:
-            section_express(name)
+            section_express(name, express_form, express_form.selection())
         else:
-            incremental_express(name)
+            incremental_express(name, express_form, express_form.selection())
 
     express_form.bind("<Double-Button-1>", open_detail_express)
 
     # 运费页面按钮
-    tkinter.Button(express_frame, text="  导入新运费模板  ", font=message_font, command=add_express_template).place(relx=0.05,
-                                                                                                             rely=0.91)
+    tkinter.Button(express_frame, text="  导入新运费模板  ", font=message_font,
+                   command=lambda: add_express_template(express_form)).place(relx=0.05,
+                                                                             rely=0.91)
     tkinter.Button(express_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
 
 
@@ -320,7 +344,7 @@ def add_packing_template(packing_form):
         cost += float(waterproof_cost.get())
         cost += float(paper_box_cost.get())
         inputer.append(cost)
-        packing_form.insert("", 1, text="line", value=inputer)
+        packing_form.insert("", 0, text="end", values=inputer)
         packing_models.append(inputer)
         update()
         add_pacing_window.destroy()
@@ -331,7 +355,7 @@ def add_packing_template(packing_form):
                                                                                                 rely=y_local + 0.05)
 
 
-def add_express_template():
+def add_express_template(express_form):
     """
     添加运费模版
     :return:
@@ -347,32 +371,56 @@ def add_express_template():
     express_iv = tkinter.IntVar()
     tkinter.Radiobutton(add_express_window, text="增量式", value=1, variable=express_iv).place(relx=0.15, rely=0.3)
     tkinter.Radiobutton(add_express_window, text="区间式", value=2, variable=express_iv).place(relx=0.55, rely=0.3)
+
+    def get_express_xslm():
+        """
+        获取运费模版文件
+        :return:
+        """
+        add_express_window.destroy()
+        print(express_iv.get())
+        filename = filedialog.askopenfilename()
+        if str(filename).endswith(".xlsx"):
+            temp = pd.read_excel(filename)
+            if temp.columns.size == 3:
+                if messagebox.askokcancel("提醒", "是否是增量式？") and express_iv.get() == 1:
+                    name = str(filename).split("/")[-1].split(".")[0] + "(增量式)"
+                    global_data[name] = temp
+                    express_models[name] = {}
+                    express_models[name]["columns"] = temp.columns
+                    express_models[name]["value"] = np.array(temp).tolist()
+                    express_models[name]["type"] = 1
+                    express_form.insert("", 0, "end", values=(name))
+                    messagebox.askokcancel("提醒", "导入成功")
+
+            elif temp.columns.size > 3:
+                if messagebox.askokcancel("提醒", "是否是区间式？") and express_iv.get() == 2:
+                    name = str(filename).split("/")[-1].split(".")[0] + "(区间式)"
+                    global_data[name] = temp
+                    express_models[name] = {}
+                    express_models[name]["columns"] = temp.columns
+                    express_models[name]["value"] = np.array(temp).tolist()
+                    express_models[name]["type"] = 2
+                    print(name)
+                    express_form.insert("", 0, "end", values=(name))
+
+                    messagebox.askokcancel("提醒", "导入成功")
+
+            else:
+                messagebox.askokcancel("操作错误", "模板表格有问题，增量式应为3列，区间式应大于3列，请确认！")
+        else:
+            messagebox.askokcancel("操作错误", "请选择表格文件！")
+        update()
+
     tkinter.Button(add_express_window, text=" 选择文件开始导入 ", command=get_express_xslm).place(relx=0.28, rely=0.7)
 
 
-def get_express_xslm():
-    """
-    获取运费模版文件
-    :return:
-    """
-    filename = filedialog.askopenfilename()
-    if str(filename).endswith(".xlsx"):
-        temp = pd.read_excel(filename)
-        if temp.columns.size == 18:
-            global_data["总表dataframe"] = temp
-            template_toplevel()
-        else:
-            message = "总表应有18列，您选择的表格有" + str(temp.columns.size) + "列"
-            messagebox.askokcancel("操作错误", message)
-    else:
-        messagebox.askokcancel("操作错误", "请选择表格文件！")
-
-
-def section_express(name):
+def section_express(name, express_form, choose_item):
     """
     区间式显示详细窗口
     :return:
     """
+    name = name[0]
     section_window = tkinter.Toplevel()
     section_window.title(name)
     section_window.geometry("1000x600+300+150")
@@ -383,33 +431,41 @@ def section_express(name):
     section_list_frame = tkinter.Frame(section_window, width=1000, height=500, bg="#BDBDBD")
     section_form = ttk.Treeview(section_list_frame, show="headings", height=25)
     section_scroll = tkinter.Scrollbar(section_list_frame)
-    section_columns = [
-        "目的省份", "首1kg(元)", "1.5kg-3kg(元)", ">3kg(元)"
-    ]
+    section_columns = express_models[name]["columns"].tolist()
+    print(section_columns)
     section_form["columns"] = section_columns
     for i in range(len(section_columns)):
         if i == 0:
             wid = int(980 / 3 * 2)
         else:
             wid = int(980 / 3 / (len(section_columns) - 1))
-        section_form.column(section_columns[i], width=wid, anchor="center")
+
+        section_form.column(str(section_columns[i]), width=wid, anchor="center")
         section_form.heading(section_columns[i], text=section_columns[i])
-    section_form.insert("", 0, text="line", values=("四川、山西", 5, 6, 3))
-    section_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海", 7, 8, 9))
-    section_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海、北京、上海、北京、上海、北京、上海", 12, 23, 43))
+    for item in express_models[name]["value"]:
+        section_form.insert("", 0, text="end", values=item)
+
     section_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
     section_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
     section_scroll.config(command=section_form.yview)
     section_form.config(yscrollcommand=section_scroll.set)
     section_list_frame.pack()
-    tkinter.Button(section_window, text="删除该模版", font=message_font).pack()
+
+    def delete_item():
+        express_models.pop(name)
+        express_form.delete(choose_item)
+        update()
+        section_window.destroy()
+
+    tkinter.Button(section_window, text="删除该模版", font=message_font, command=delete_item).pack()
 
 
-def incremental_express(name):
+def incremental_express(name, express_form, choose_item):
     """
     增量式显示详细窗口
     :return:
     """
+    name = name[0]
     incremental_window = tkinter.Toplevel()
     incremental_window.title(name)
     incremental_window.geometry("1000x600+300+150")
@@ -420,10 +476,8 @@ def incremental_express(name):
     incremental_list_frame = tkinter.Frame(incremental_window, width=1000, height=500, bg="#BDBDBD")
     incremental_form = ttk.Treeview(incremental_list_frame, show="headings", height=25)
     incremental_scroll = tkinter.Scrollbar(incremental_list_frame)
-    incremental_columns = [
-        "目的省份", "首1kg(元)", ">1kg(元/kg)"
-    ]
-    incremental_form["columns"] = incremental_columns
+    incremental_columns = express_models[name]["columns"]
+    incremental_form["columns"] = incremental_columns.tolist()
     for i in range(len(incremental_columns)):
         if i == 0:
             wid = int(980 / 3 * 2)
@@ -431,15 +485,22 @@ def incremental_express(name):
             wid = int(980 / 3 / (len(incremental_columns) - 1))
         incremental_form.column(incremental_columns[i], width=wid, anchor="center")
         incremental_form.heading(incremental_columns[i], text=incremental_columns[i])
-    incremental_form.insert("", 0, text="line", values=("四川、山西", 5, 6))
-    incremental_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海", 7, 8))
-    incremental_form.insert("", 0, text="line", values=("北京、上海、北京、上海、北京、上海、北京、上海、北京、上海、北京、上海", 12, 23))
+    for item in express_models[name]["value"]:
+        incremental_form.insert("", 0, text="end", values=item)
+
     incremental_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
     incremental_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
     incremental_scroll.config(command=incremental_form.yview)
     incremental_form.config(yscrollcommand=incremental_scroll.set)
     incremental_list_frame.pack()
-    tkinter.Button(incremental_window, text="删除该模版", font=message_font).pack()
+
+    def delete_item():
+        express_models.pop(name)
+        express_form.delete(choose_item)
+        update()
+        incremental_window.destroy()
+
+    tkinter.Button(incremental_window, text="删除该模版", font=message_font, command=delete_item).pack()
 
 
 # 主窗口
@@ -510,9 +571,9 @@ for i in range(len(whole_columns)):
     whole_tree.column(whole_columns[i], width=int((whole_width - 50) / len(whole_columns)), anchor="center")
     whole_tree.heading(whole_columns[i], text=whole_columns[i])
 for i in range(50):
-    whole_tree.insert("", i, text="line", values=(i, "店三大铺", "萨达", "润体乳", "123", "3543",
-                                                  "1", "2", "3", "4", "5",
-                                                  "6", "234234", "234", "23", "234"))
+    whole_tree.insert("", i, text="end", values=(i, "店三大铺", "萨达", "润体乳", "123", "3543",
+                                                 "1", "2", "3", "4", "5",
+                                                 "6", "234234", "234", "23", "234"))
 whole_tree.pack(side=tkinter.LEFT, fill=tkinter.Y)
 whole_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
 whole_scroll.config(command=whole_tree.yview)
