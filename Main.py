@@ -13,7 +13,13 @@ global_data = {}
 总表dataframe
 食材信息
 地区信息
+所有信息
+显示的信息
+食材重量范围
 """
+
+lack_packing = []
+lack_express = []
 packing_models = []
 express_models = {}
 if not os.path.exists(r"./packing_file.txt"):
@@ -56,18 +62,44 @@ def get_foodinfor():
     temp["货品名称"] = temp["货品名称"].apply(lambda x: drop_char(x))
     global_data["食材信息"] = temp
     global_data["食材名"] = tuple(temp["货品名称"].unique())
-    print(global_data["食材名"])
+    # print(global_data["食材名"])
 
+    food_weight = data[["货品名称", "预估重量"]]
+    food_weight["货品名称"] = food_weight["货品名称"].apply(lambda x: drop_char(x))
+    food_weight_min = food_weight.groupby("货品名称")["预估重量"].min()
+    food_weight_max = food_weight.groupby("货品名称")["预估重量"].max()
+    names = np.array(food_weight_max.index)
+    names = names.reshape((len(names), 1))
+    food_weight_max_min = pd.concat([food_weight_min, food_weight_max], axis=1)
+    food_weight_max_min = np.append(names, np.array(food_weight_max_min), axis=1)
+    global_data["食材重量范围"] = food_weight_max_min
 
-def get_addressinfor():
     """
-    获取地区信息
+    获取所有需要的信息
     :return:
     """
+
     data = global_data["总表dataframe"]
-    temp = data["收货地区"]
-    print(temp)
-    global_data["地区信息"] = temp
+    whole_data = data[["订单编号", "店铺", "仓库", "货品名称", "预估重量", "订单预估成本", "收货地区", "物流公司"]]
+
+    def drop_location_char(x):
+        drop_list = ['省', '市', '自治区', '自治州', '壮族', '维吾尔', '回族', ]
+        for i in drop_list:
+            x = x.replace(str(i), '')
+        x = x.split(" ")[:2]
+        return x
+
+    whole_data["收货地区"] = whole_data["收货地区"].apply(lambda x: drop_location_char(x))
+
+    def drop_char(x):
+        drop_list = ['g', 'k', '斤', '克', '半', '一', '二', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        for i in drop_list:
+            x = x.replace(str(i), '')
+        return x
+
+    whole_data["货品名称"] = whole_data["货品名称"].apply(lambda x: drop_char(x))
+    global_data["所有信息"] = whole_data
+    # print(global_data)
 
 
 # 字体
@@ -96,7 +128,7 @@ def import_button():
         temp = pd.read_excel(filename)
         if temp.columns.size == 18:
             global_data["总表dataframe"] = temp
-            get_addressinfor()
+
             get_foodinfor()
             template_toplevel()
         else:
@@ -106,16 +138,163 @@ def import_button():
         messagebox.askokcancel("操作错误", "请选择表格文件！")
 
 
+def has_packing(name, low, high):
+    """
+    判断是否有name产品的包装
+    :param name:
+    :param low:
+    :param high:
+    :return:
+    """
+    low_ok = False
+    high_ok = False
+    for item in packing_models:
+        model_name = item[0]
+        if model_name == name:
+            section = item[1]
+            section = section[:-2]
+            section = section.split("~")
+            section_low = section[0]
+            section_high = section[1]
+            if float(low) >= float(section_low):
+                low_ok = True
+            if float(high) <= float(section_high):
+                high_ok = True
+    return (low_ok and high_ok)
+
+
+def get_pack(name, weight):
+    """
+    查询包装
+    :param name:
+    :param weight:
+    :return:
+    """
+    for item in packing_models:
+        model_name = item[0]
+        if model_name == name:
+            section = item[1]
+            section = section[:-2]
+            section = section.split("~")
+            section_low = section[0]
+            section_high = section[1]
+            if weight >= float(section_low) and weight <= float(section_high):
+                return item[2:]
+    return -1
+
+
+def import_whole_data():
+    """
+    导入总表的最终逻辑
+    :return:
+    """
+    # 食材重量范围
+    express_ok = False
+    packing_ok = False
+    food_weight_min_max = global_data["食材重量范围"]
+    lack_packing.clear()
+    for item in food_weight_min_max:
+        name = item[0]
+        low = item[1]
+        hight = item[2]
+        if not has_packing(name, low, hight):
+            lack_packing.append(item)
+    if len(lack_packing) == 0:
+        box = []
+        bag = []
+        ice_bg = []
+        ice = []
+        waterproof = []
+        paper_box = []
+        cost = []
+        all_weight = []
+        packing_ok = True
+        whole_data = global_data["所有信息"]
+        packing_list = []
+        name_weight = np.array(whole_data[["货品名称", "预估重量"]])
+        packing_list.clear()
+        for item in name_weight:
+            if get_pack(item[0], item[1]) != -1:
+                packing_list.append(get_pack(item[0], item[1]))
+            else:
+                messagebox.askokcancel("警告", "未找到%s%.2f的模板" % (item[0], item[1]))
+                break
+        for item in packing_list:
+            box.append(item[0])
+            bag.append(item[1])
+            ice_bg.append(item[2])
+            ice.append(item[3])
+            waterproof.append(item[4])
+            paper_box.append(item[5])
+            cost.append(item[6])
+            sum = 0
+            for index in range(7):
+                sum += float(item[index])
+            all_weight.append(sum)
+        box = np.reshape(box, (len(box), 1))
+        bag = np.reshape(bag, (len(bag), 1))
+        ice_bg = np.reshape(ice_bg, (len(ice_bg), 1))
+        ice = np.reshape(ice, (len(ice), 1))
+        waterproof = np.reshape(waterproof, (len(waterproof), 1))
+        paper_box = np.reshape(paper_box, (len(paper_box), 1))
+        cost = np.reshape(cost, (len(cost), 1))
+        all_weight = np.reshape(all_weight, (len(all_weight), 1))
+        temp = np.append(box, bag, axis=1)
+        temp = np.append(temp, ice_bg, axis=1)
+        temp = np.append(temp, ice, axis=1)
+        temp = np.append(temp, waterproof, axis=1)
+        temp = np.append(temp, paper_box, axis=1)
+        temp = np.append(temp, cost, axis=1)
+        temp = np.append(temp, all_weight, axis=1)
+
+        new_df = pd.DataFrame(columns=["保温箱重量", "保温袋重量", "冰袋重量", "干冰重量", "防水袋重量", "纸箱重量", "包装总价", "包装总重"],
+                              data=temp)
+        whole_data = whole_data.join(new_df)
+        global_data["所有信息"] = whole_data
+        # print(packing_list)
+    else:
+        message = "%s未找到%.1f~%.1f区间的包装模板，请补充!" % (lack_packing[0][0], lack_packing[0][1], lack_packing[0][2])
+        messagebox.askokcancel("错误", message)
+    # 运费
+    whole_data = global_data["所有信息"]
+    express_data = whole_data[["收货地区", "物流公司", "包装总重", "预估重量"]]
+    all_express = express_data["物流公司"].unique()
+    lack_express.clear()
+    for item in all_express:
+        if item not in express_models.keys():
+            lack_express.append(item)
+    if len(lack_express) != 0:
+        messagebox.askokcancel("错误", "未找到%s的运费模板，请补充!" % (lack_express[0]))
+    else:
+        # print(np.array(express_data))
+        express_cost = []
+        for item in np.array(express_data):
+            province = item[0][0]
+            city = item[0][1]
+            company = item[1]
+            weight = float(item[2]) + float(item[3])
+            calculate_express_cost(province, city, company, weight)
+            break
+
+
+def calculate_express_cost(province, city, company, weight):
+    calculate_model = express_models[company]
+    print(calculate_model)
+
+
 def template_toplevel():
     """
     选择模版
     :return:
     """
+
     # 模板子窗格
     template_window = tkinter.Toplevel()
     template_window.title("编辑与选择模板")
     template_window.geometry("1200x900+350+50")
     template_window.resizable(0, 0)
+    pack_lack_str = tkinter.StringVar()
+    express_lack_str = tkinter.StringVar()
 
     # tab
     notebook = ttk.Notebook(template_window)
@@ -158,14 +337,67 @@ def template_toplevel():
             packing_models.remove(value)
             packing_form.delete(item)
             update()
+            getpacklackinfor(pack_lack_str)
             tkinter.messagebox.showinfo('提醒', '删除成功')
 
     packing_form.bind("<Double-Button-1>", deleteitem)
+
     # 包装页面按钮
     tkinter.Button(packing_frame, text="  导入新包装模板  ", font=message_font,
-                   command=lambda: add_packing_template(packing_form)).place(relx=0.05,
-                                                                             rely=0.91)
-    tkinter.Button(packing_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
+                   command=lambda: add_packing_template(packing_form, pack_lack_str)).place(relx=0.05,
+                                                                                            rely=0.91)
+
+    def see_pack_lack():
+        """
+        查看缺少包装的食材
+        :return:
+        """
+        lack_window = tkinter.Toplevel()
+        lack_window.title("缺少模板")
+        lack_window.geometry("600x400+800+250")
+        lack_window.resizable(0, 0)
+        tkinter.Label(lack_window, text="缺少模板的食材以及对应区间", width=40, height=2, font=message_font).place(x=0, y=0)
+        # 包装表格
+        lack_list_frame = tkinter.Frame(lack_window, width=600, height=400, bg="#BDBDBD")
+        lack_form = ttk.Treeview(lack_list_frame, show="headings", height=15)
+        lack_scroll = tkinter.Scrollbar(lack_list_frame)
+        lack_columns = [
+            "食材名", "目前总表里已有的重量区间（最小值与最大值）"
+        ]
+        lack_form["columns"] = lack_columns
+        for i in range(len(lack_columns)):
+            lack_form.column(lack_columns[i], width=int(570 / len(lack_columns)), anchor="center")
+            lack_form.heading(lack_columns[i], text=lack_columns[i])
+        for item in lack_packing:
+            temp = [item[0]]
+            print(item)
+            temp.append("%.2f~%.2fkg" % (item[1], item[2]))
+            lack_form.insert("", "end", values=temp)
+        lack_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
+        lack_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+        lack_scroll.config(command=lack_form.yview)
+        lack_form.config(yscrollcommand=lack_scroll.set)
+        lack_list_frame.place(y=10)
+
+        # 包装页面按钮
+        tkinter.Button(lack_window, text="  导入新包装模板  ", font=message_font,
+                       command=lambda: add_packing_template(packing_form, pack_lack_str)).place(relx=0.05,
+                                                                                                rely=0.91)
+
+        def back():
+            lack_window.destroy()
+
+        tkinter.Button(lack_window, text="  返回  ", font=message_font,
+                       command=back).place(relx=0.75,
+                                           rely=0.91)
+
+    getpacklackinfor(pack_lack_str)
+    if len(lack_packing) != 0:
+        tkinter.Button(packing_frame, textvariable=pack_lack_str, font=("黑体", 16), fg="red",
+                       command=see_pack_lack).place(relx=0.35, rely=0.91)
+
+    tkinter.Button(packing_frame, text="  确定模板开始导入  ", font=message_font, command=import_whole_data).place(relx=0.75,
+                                                                                                           rely=0.91)
     # 快递模板
     express_frame = tkinter.Frame(notebook, width=1170, height=800)
     notebook.add(packing_frame, text="       包装模板        ")
@@ -200,9 +432,12 @@ def template_toplevel():
         :return:
         """
         name = express_form.item(express_form.selection(), "values")
+        # express_models[name]["type"]
+        name = name[0]
+        print(name)
 
-        if str(name).find("区间式") != -1:
-            section_express(name, express_form, express_form.selection())
+        if express_models[name]["type"] == 2:
+            section_express(name, express_form, express_form.selection(), express_lack_str)
         else:
             incremental_express(name, express_form, express_form.selection())
 
@@ -210,12 +445,95 @@ def template_toplevel():
 
     # 运费页面按钮
     tkinter.Button(express_frame, text="  导入新运费模板  ", font=message_font,
-                   command=lambda: add_express_template(express_form)).place(relx=0.05,
-                                                                             rely=0.91)
-    tkinter.Button(express_frame, text="  确定模板开始导入  ", font=message_font).place(relx=0.75, rely=0.91)
+                   command=lambda: add_express_template(express_form, express_lack_str)).place(relx=0.05,
+                                                                                               rely=0.91)
+
+    def see_express_lack():
+        """
+        查看缺少的快递模板
+        :return:
+        """
+        lack_express_window = tkinter.Toplevel()
+        lack_express_window.title("缺少模板")
+        lack_express_window.geometry("600x400+800+250")
+        lack_express_window.resizable(0, 0)
+        tkinter.Label(lack_express_window, text="缺少的货运公司模板", width=40, height=2, font=message_font).place(x=0, y=0)
+        # 包装表格
+        lack_express_list_frame = tkinter.Frame(lack_express_window, width=600, height=400, bg="#BDBDBD")
+        lack_express_form = ttk.Treeview(lack_express_list_frame, show="headings", height=15)
+        lack_express_scroll = tkinter.Scrollbar(lack_express_list_frame)
+        lack_express_columns = [
+            "公司名"
+        ]
+        lack_express_form["columns"] = lack_express_columns
+        for i in range(len(lack_express_columns)):
+            lack_express_form.column(lack_express_columns[i], width=int(570 / len(lack_express_columns)),
+                                     anchor="center")
+            lack_express_form.heading(lack_express_columns[i], text=lack_express_columns[i])
+        for item in lack_express:
+            lack_express_form.insert("", "end", values=(item))
+        lack_express_form.pack(side=tkinter.LEFT, fill=tkinter.Y)
+        lack_express_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+        lack_express_scroll.config(command=lack_express_form.yview)
+        lack_express_form.config(yscrollcommand=lack_express_scroll.set)
+        lack_express_list_frame.place(y=10)
+
+        # 包装页面按钮
+        tkinter.Button(lack_express_window, text="  导入新运费模板  ", font=message_font,
+                       command=lambda: add_express_template(lack_express_form, express_lack_str)).place(relx=0.05,
+                                                                                                        rely=0.91)
+
+        def back():
+            lack_express_window.destroy()
+
+        tkinter.Button(lack_express_window, text="  返回  ", font=message_font,
+                       command=back).place(relx=0.75,
+                                           rely=0.91)
+
+    getexpresslackinfor(express_lack_str)
+    if len(lack_express) != 0:
+        tkinter.Button(express_frame, textvariable=express_lack_str, font=("黑体", 16), fg="red",
+                       command=see_express_lack).place(relx=0.35, rely=0.91)
+
+    tkinter.Button(express_frame, text="  确定模板开始导入  ", font=message_font, command=import_whole_data).place(relx=0.75,
+                                                                                                           rely=0.91)
 
 
-def add_packing_template(packing_form):
+def getpacklackinfor(lack_str):
+    """
+    计算缺少多少包装模板
+    :param lack_str:
+    :return:
+    """
+    food_weight_min_max = global_data["食材重量范围"]
+    lack_packing.clear()
+    for item in food_weight_min_max:
+        name = item[0]
+        low = item[1]
+        hight = item[2]
+        if not has_packing(name, low, hight):
+            lack_packing.append(item)
+
+    lack_str.set("还有%d个食材没找到模板，点我查看" % (len(lack_packing)))
+
+
+def getexpresslackinfor(lack_str):
+    """
+    计算缺少多少运费模板
+    :param lack_str:
+    :return:
+    """
+    data = global_data["所有信息"]
+    all_express = data["物流公司"].unique()
+    lack_express.clear()
+    for item in all_express:
+        if item not in express_models.keys():
+            lack_express.append(item)
+    print(lack_express)
+    lack_str.set("还有%d个快递公司没找到模板，点我查看" % (len(lack_express)))
+
+
+def add_packing_template(packing_form, lack_str):
     inputer = []
     """
     添加包装模版
@@ -348,6 +666,7 @@ def add_packing_template(packing_form):
         packing_models.append(inputer)
         update()
         add_pacing_window.destroy()
+        getpacklackinfor(lack_str)
 
     tkinter.Button(add_pacing_window, text="  确定添加  ", font=message_font, command=add).place(relx=0.6,
                                                                                              rely=y_local + 0.05)
@@ -355,7 +674,7 @@ def add_packing_template(packing_form):
                                                                                                 rely=y_local + 0.05)
 
 
-def add_express_template(express_form):
+def add_express_template(express_form, express_lack_str):
     """
     添加运费模版
     :return:
@@ -384,7 +703,7 @@ def add_express_template(express_form):
             temp = pd.read_excel(filename)
             if temp.columns.size == 3:
                 if messagebox.askokcancel("提醒", "是否是增量式？") and express_iv.get() == 1:
-                    name = str(filename).split("/")[-1].split(".")[0] + "(增量式)"
+                    name = str(filename).split("/")[-1].split(".")[0] + ""
                     global_data[name] = temp
                     express_models[name] = {}
                     express_models[name]["columns"] = temp.columns
@@ -395,7 +714,7 @@ def add_express_template(express_form):
 
             elif temp.columns.size > 3:
                 if messagebox.askokcancel("提醒", "是否是区间式？") and express_iv.get() == 2:
-                    name = str(filename).split("/")[-1].split(".")[0] + "(区间式)"
+                    name = str(filename).split("/")[-1].split(".")[0] + ""
                     global_data[name] = temp
                     express_models[name] = {}
                     express_models[name]["columns"] = temp.columns
@@ -405,6 +724,7 @@ def add_express_template(express_form):
                     express_form.insert("", 0, "end", values=(name))
 
                     messagebox.askokcancel("提醒", "导入成功")
+                    getexpresslackinfor(express_lack_str)
 
             else:
                 messagebox.askokcancel("操作错误", "模板表格有问题，增量式应为3列，区间式应大于3列，请确认！")
@@ -415,12 +735,12 @@ def add_express_template(express_form):
     tkinter.Button(add_express_window, text=" 选择文件开始导入 ", command=get_express_xslm).place(relx=0.28, rely=0.7)
 
 
-def section_express(name, express_form, choose_item):
+def section_express(name, express_form, choose_item, lack_str):
     """
     区间式显示详细窗口
     :return:
     """
-    name = name[0]
+
     section_window = tkinter.Toplevel()
     section_window.title(name)
     section_window.geometry("1000x600+300+150")
@@ -456,6 +776,7 @@ def section_express(name, express_form, choose_item):
         express_form.delete(choose_item)
         update()
         section_window.destroy()
+        getexpresslackinfor(lack_str)
 
     tkinter.Button(section_window, text="删除该模版", font=message_font, command=delete_item).pack()
 
@@ -465,7 +786,6 @@ def incremental_express(name, express_form, choose_item):
     增量式显示详细窗口
     :return:
     """
-    name = name[0]
     incremental_window = tkinter.Toplevel()
     incremental_window.title(name)
     incremental_window.geometry("1000x600+300+150")
