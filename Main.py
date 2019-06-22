@@ -8,7 +8,7 @@ import pickle
 import numpy as np
 import os
 
-global_data = {}
+global_data = {"扣点比例": 0.0}
 """
 总表dataframe
 食材信息
@@ -80,7 +80,7 @@ def get_foodinfor():
     """
 
     data = global_data["总表dataframe"]
-    whole_data = data[["订单编号", "店铺", "仓库", "货品名称", "预估重量", "订单预估成本", "收货地区", "物流公司"]]
+    whole_data = data[["订单编号", "店铺", "仓库", "货品名称", "预估重量", "订单预估成本", "订单支付金额", "收货地区", "物流公司"]]
 
     def drop_location_char(x):
         drop_list = ['省', '市', '自治区', '自治州', '壮族', '维吾尔', '回族', ]
@@ -118,7 +118,7 @@ def get_cost(closing_cost, goods_cost, packing_cost, freight, platform=0):
     return goods_cost + packing_cost + freight + closing_cost * (1 - platform)
 
 
-def import_button():
+def import_button(form):
     """
     导入总表点击事件
     :return:
@@ -130,7 +130,7 @@ def import_button():
             global_data["总表dataframe"] = temp
 
             get_foodinfor()
-            template_toplevel()
+            template_toplevel(form)
         else:
             message = "总表应有18列，您选择的表格有" + str(temp.columns.size) + "列"
             messagebox.askokcancel("操作错误", message)
@@ -183,14 +183,36 @@ def get_pack(name, weight):
     return -1
 
 
-def import_whole_data():
+def platform_point(form):
+    """
+    计算平台扣点
+    :return:
+    """
+    input_percent_window = tkinter.Toplevel()
+    input_percent_window.title("输入平台扣点比例")
+    input_percent_window.geometry("300x200+800+200")
+    input_percent_window.resizable(0, 0)
+    tkinter.Label(input_percent_window, text="平台扣点比例：", font=message_font).place(relx=0.15, rely=0.3)
+    editer = tkinter.Entry(input_percent_window, width=5)
+    editer.place(relx=0.6, rely=0.3)
+    tkinter.Label(input_percent_window, text="%", font=message_font).place(relx=0.7, rely=0.3)
+
+    def get_percent():
+        percent = float(editer.get())
+        if messagebox.askokcancel("提醒", "确认平台扣点比例为百分之%.2f?" % (percent)):
+            global_data["扣点比例"] = percent
+            import_whole_data(form)
+            input_percent_window.destroy()
+
+    tkinter.Button(input_percent_window, text=" 确定 ", font=message_font, command=get_percent).place(rely=0.7, relx=0.40)
+
+
+def import_whole_data(form):
     """
     导入总表的最终逻辑
     :return:
     """
     # 食材重量范围
-    express_ok = False
-    packing_ok = False
     food_weight_min_max = global_data["食材重量范围"]
     lack_packing.clear()
     for item in food_weight_min_max:
@@ -208,7 +230,7 @@ def import_whole_data():
         paper_box = []
         cost = []
         all_weight = []
-        packing_ok = True
+
         whole_data = global_data["所有信息"]
         packing_list = []
         name_weight = np.array(whole_data[["货品名称", "预估重量"]])
@@ -266,6 +288,7 @@ def import_whole_data():
     if len(lack_express) != 0:
         messagebox.askokcancel("错误", "未找到%s的运费模板，请补充!" % (lack_express[0]))
     else:
+
         # print(np.array(express_data))
         express_cost = []
         for item in np.array(express_data):
@@ -273,8 +296,39 @@ def import_whole_data():
             city = item[0][1]
             company = item[1]
             weight = float(item[2]) + float(item[3])
-            calculate_express_cost(province, city, company, weight)
-            break
+            express_cost.append(calculate_express_cost(province, city, company, weight))
+        express_cost = np.reshape(express_cost, (len(express_cost), 1))
+        express_cost = pd.DataFrame(columns=["运费"], data=express_cost)
+        whole_data = whole_data.join(express_cost)
+        global_data["所有信息"] = whole_data
+        # print(whole_data)
+    # 计算平台扣点
+    data = global_data["所有信息"]
+    pay_data = np.array(data["订单支付金额"]).tolist()
+    platform_cost = []
+    percent = global_data["扣点比例"]
+    for item in pay_data:
+        platform_cost.append(round(item * (percent / 100.0), 2))
+    platform_cost = np.reshape(platform_cost, (len(platform_cost), 1))
+    platform_cost = pd.DataFrame(columns=["平台扣点"], data=platform_cost)
+    data = data.join(platform_cost)
+    global_data["所有信息"] = data
+
+    profits = []
+    profit_data = np.array(data[["订单支付金额", "订单预估成本", "包装总价", "运费", "平台扣点"]], dtype=float)
+    for item in profit_data:
+        profits.append([round(item[0] - item[1] - item[2] - item[3] - item[4], 2)])
+    whole_profit["text"] = (profit_str + str(np.sum(profits)) + "元")
+    profits = pd.DataFrame(columns=["利润"], data=profits)
+    data = data.join(profits)
+    global_data["所有信息"] = data
+
+    show_data = global_data["所有信息"]
+    show_data = np.array(show_data[["订单编号", "店铺", "仓库", "货品名称", "预估重量", "保温箱重量",
+                                    "保温袋重量", "冰袋重量", "干冰重量", "防水袋重量", "纸箱重量",
+                                    "包装总价", "订单预估成本", "运费", "平台扣点", "利润"]]).tolist()
+    for index in range(len(show_data)):
+        form.insert("", index, text="end", values=show_data[index])
 
 
 def calculate_express_cost(province, city, company, weight):
@@ -286,6 +340,7 @@ def calculate_express_cost(province, city, company, weight):
     :param weight:
     :return:
     """
+    cost = 0
     calculate_model = express_models[company]
     section = calculate_model["columns"]
     values = calculate_model["value"]
@@ -295,20 +350,48 @@ def calculate_express_cost(province, city, company, weight):
         # 区间式
         section = get_section(section)
         contain_index = -1
+        xuzhong = 0
         for index in range(len(section)):
-            if weight >= section[index][0] and weight <= section[index][1]:
+            if weight >= float(section[index][0]) and weight <= float(section[index][1]):
                 contain_index = index
+                if contain_index == 2:
+                    contain_index = contain_index - 1
+                    xuzhong = weight - float(section[index][0])
+                    weight = float(section[index][0])
                 break
         if contain_index == -1:
             messagebox.askokcancel("错误", "未在%s中找到重量%.2f的收费标准,请确认后重新导表！" % (company, weight))
         else:
             for item in values:
+                item[0] = str(item[0])
+                # print(item[0], city)
                 if item[0].find(city) != -1:
-                    pass
-        pass
+                    cost = float(item[contain_index + 1]) * weight + xuzhong * float(item[contain_index + 2])
+                    break
+                elif item[0].find(province) != -1:
+                    cost = float(item[contain_index + 1]) * weight + xuzhong * float(item[contain_index + 2])
+                    break
+                else:
+                    cost = 0
     if type == 1:
         # 增量式
-        pass
+        xuzhong = 0
+        section = get_section(section)
+        print(section)
+        split = float(section[0][1])
+        for item in values:
+            if item[0].find(city) != -1:
+                if weight > split:
+                    xuzhong = weight - split
+                    weight = split
+                cost = float(item[1]) * weight + xuzhong * float(item[2])
+                break
+            elif item[0].find(province) != -1:
+                cost = float(item[1]) * weight + xuzhong * float(item[2])
+                break
+            else:
+                cost = 0
+    return cost
 
 
 def get_section(index):
@@ -331,11 +414,11 @@ def get_section(index):
                 sections[i] = sections[i].split("<")
                 sections[i][0] = 0
         else:
-            sections[i] = [sections[i], sections[i]]
+            sections[i] = [0, sections[i]]
     return sections
 
 
-def template_toplevel():
+def template_toplevel(form):
     """
     选择模版
     :return:
@@ -449,8 +532,9 @@ def template_toplevel():
         tkinter.Button(packing_frame, textvariable=pack_lack_str, font=("黑体", 16), fg="red",
                        command=see_pack_lack).place(relx=0.35, rely=0.91)
 
-    tkinter.Button(packing_frame, text="  确定模板开始导入  ", font=message_font, command=import_whole_data).place(relx=0.75,
-                                                                                                           rely=0.91)
+    tkinter.Button(packing_frame, text="  确定模板开始导入  ", font=message_font, command=lambda: platform_point(form)).place(
+        relx=0.75,
+        rely=0.91)
     # 快递模板
     express_frame = tkinter.Frame(notebook, width=1170, height=800)
     notebook.add(packing_frame, text="       包装模板        ")
@@ -548,8 +632,9 @@ def template_toplevel():
         tkinter.Button(express_frame, textvariable=express_lack_str, font=("黑体", 16), fg="red",
                        command=see_express_lack).place(relx=0.35, rely=0.91)
 
-    tkinter.Button(express_frame, text="  确定模板开始导入  ", font=message_font, command=import_whole_data).place(relx=0.75,
-                                                                                                           rely=0.91)
+    tkinter.Button(express_frame, text="  确定模板开始导入  ", font=message_font, command=lambda: platform_point(form)).place(
+        relx=0.75,
+        rely=0.91)
 
 
 def getpacklackinfor(lack_str):
@@ -910,7 +995,8 @@ window.bind("<Button-3>", showMenu)
 # 主界面功能按钮
 
 # 导入总表按钮
-button_import_whole = tkinter.Button(window, text="    导入总表查看利润    ", font=message_font, command=import_button)
+button_import_whole = tkinter.Button(window, text="    导入总表查看利润    ", font=message_font,
+                                     command=lambda: import_button(whole_tree))
 button_import_whole.place(x=10, y=5)
 
 # 主界面搜索按钮
@@ -935,7 +1021,7 @@ whole_tree = ttk.Treeview(form_context, show="headings", height=40)
 whole_scroll = tkinter.Scrollbar(form_context)
 # 填充表数据
 whole_columns = (
-    "订单号", "店铺", "发货仓库", "食材", "量",
+    "订单号", "店铺", "发货仓库", "食材", "食材重量",
     "保温箱重量", "保温袋重量", "冰袋重量", "干冰重量", "防水袋重量",
     "纸箱重量", "包装总价", "食材总成本", "运费", "平台扣点", "纯利润"
 )
@@ -943,10 +1029,7 @@ whole_tree["columns"] = whole_columns
 for i in range(len(whole_columns)):
     whole_tree.column(whole_columns[i], width=int((whole_width - 50) / len(whole_columns)), anchor="center")
     whole_tree.heading(whole_columns[i], text=whole_columns[i])
-for i in range(50):
-    whole_tree.insert("", i, text="end", values=(i, "店三大铺", "萨达", "润体乳", "123", "3543",
-                                                 "1", "2", "3", "4", "5",
-                                                 "6", "234234", "234", "23", "234"))
+
 whole_tree.pack(side=tkinter.LEFT, fill=tkinter.Y)
 whole_scroll.pack(side=tkinter.RIGHT, fill=tkinter.Y)
 whole_scroll.config(command=whole_tree.yview)
