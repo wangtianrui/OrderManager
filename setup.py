@@ -9,7 +9,7 @@ options = {
     'build_exe':
         {
             'excludes': ['Tkinter'],
-            'packages': ['pandas', 'numpy'],
+            'packages': ['pandas', 'os', 'pickle','numpy'],
 
         }
 }
