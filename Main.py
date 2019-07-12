@@ -324,11 +324,14 @@ def import_whole_data(form):
     global_data["所有信息"] = data
 
     show_data = global_data["所有信息"]
-    show_data = np.array(show_data[["订单编号", "店铺", "仓库", "货品名称", "预估重量", "保温箱重量",
-                                    "保温袋重量", "冰袋重量", "干冰重量", "防水袋重量", "纸箱重量",
-                                    "包装总价", "订单预估成本", "运费", "平台扣点", "利润"]]).tolist()
+    temp = show_data[["订单编号", "店铺", "仓库", "货品名称", "预估重量", "保温箱重量",
+                      "保温袋重量", "冰袋重量", "干冰重量", "防水袋重量", "纸箱重量",
+                      "包装总价", "订单预估成本", "运费", "平台扣点", "利润"]]
+    global_data["last_data"] = temp
+    show_data = np.array(temp).tolist()
     for index in range(len(show_data)):
         form.insert("", index, text="end", values=show_data[index])
+    sort_com["value"] = tuple(list(temp.columns.values))
 
 
 def calculate_express_cost(province, city, company, weight):
@@ -1003,14 +1006,30 @@ button_import_whole.place(x=10, y=5)
 button_search = tkinter.Button(window, text="  按关键字搜索订单  ", font=message_font)
 button_search.place(x=whole_width - 500, y=5)
 
+
 # 排序
+def sort_data(*args):
+    choose_name = sort_com.get()
+    print(choose_name)
+    if choose_name != "":
+        x = whole_tree.get_children()
+        for item in x:
+            whole_tree.delete(item)
+        global_data["last_data"].sort_values(choose_name, inplace=True)
+        temp = global_data["last_data"]
+        show_data = np.array(temp).tolist()
+        for index in range(len(temp)):
+            whole_tree.insert("", index, text="end", values=show_data[index])
+
+
 sort_title = tkinter.Label(window, text=" 按列排序 ", font=message_font)
 sort_title.place(x=whole_width - 300, y=7)
 sort_choices = tkinter.StringVar()
 sort_com = ttk.Combobox(window, textvariable=sort_choices)
 sort_com.place(x=whole_width - 200, y=7)
+sort_com.bind("<<ComboboxSelected>>", sort_data)
 # 排序选项
-sort_com["value"] = ("测试1", "测试2", "测试3")
+
 
 # 表格容器
 form_context = tkinter.Frame(window, width=whole_width - 20, height=whole_height - 200, bg="#BDBDBD")
@@ -1036,8 +1055,21 @@ whole_scroll.config(command=whole_tree.yview)
 whole_tree.config(yscrollcommand=whole_scroll.set)
 form_context.place(x=10, y=40)
 
+
+def export():
+    print(global_data.keys())
+    if "last_data" in global_data.keys():
+        path = filedialog.asksaveasfilename(defaultextension=".xlsx",
+                                            filetypes=[('表格文件', '.xlsx'), ('text files', '.txt')],
+                                            initialfile="导出结果")
+        # print(path)
+        global_data["last_data"].to_excel(path)
+    else:
+        messagebox.askokcancel("操作错误", "还未导入总表")
+
+
 # 底部界面
-export_excel_button = tkinter.Button(window, text="     导出表格     ", font=message_font)
+export_excel_button = tkinter.Button(window, text="     导出表格     ", command=export, font=message_font)
 export_excel_button.place(x=10, rely=0.9)
 
 import_shunfeng = tkinter.Button(window, text="    导入顺丰账单与上总表进行匹配    ", font=message_font)
@@ -1046,6 +1078,6 @@ import_shunfeng.place(relx=0.15, rely=0.9)
 whole_profit = tkinter.Label(window, font=("黑体", 20), fg="red")
 whole_profit.place(relx=0.8, rely=0.9)
 profit_str = "总利润为："
-whole_profit["text"] = profit_str + "2165"
+whole_profit["text"] = profit_str + "0"
 
 window.mainloop()
